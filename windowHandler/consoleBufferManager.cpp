@@ -68,15 +68,18 @@ bool ConsoleBufferManager::DisableScrolling(HANDLE hConsole) {
 }
 
 bool ConsoleBufferManager::ColorConsole(HANDLE hConsole, COLORREF backgroundRgb, WORD fillAttr) {
-    CONSOLE_SCREEN_BUFFER_INFOEX csbiex{ sizeof(CONSOLE_SCREEN_BUFFER_INFOEX) };
-    if (GetConsoleScreenBufferInfoEx(hConsole, &csbiex)) {
-        csbiex.ColorTable[1] = backgroundRgb;  // BLUE index override
-        csbiex.ColorTable[9] = backgroundRgb;  // INTENSE BLUE override
-        SetConsoleScreenBufferInfoEx(hConsole, &csbiex);
-    }
-
+    // Save current attribute; we won't override it permanently
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) return false;
+    WORD originalAttr = csbi.wAttributes;
+
+    // Map palette entries corresponding to the requested background
+    CONSOLE_SCREEN_BUFFER_INFOEX csbiex{ sizeof(CONSOLE_SCREEN_BUFFER_INFOEX) };
+    if (GetConsoleScreenBufferInfoEx(hConsole, &csbiex)) {
+        csbiex.ColorTable[1] = backgroundRgb;
+        csbiex.ColorTable[9] = backgroundRgb;
+        SetConsoleScreenBufferInfoEx(hConsole, &csbiex);
+    }
 
     DWORD bufferSize = DWORD(csbi.dwSize.X) * DWORD(csbi.dwSize.Y);
     COORD origin{ 0, 0 };
@@ -84,7 +87,9 @@ bool ConsoleBufferManager::ColorConsole(HANDLE hConsole, COLORREF backgroundRgb,
 
     FillConsoleOutputCharacterA(hConsole, ' ', bufferSize, origin, &written);
     FillConsoleOutputAttribute(hConsole, fillAttr, bufferSize, origin, &written);
-    SetConsoleTextAttribute(hConsole, fillAttr);
+
+    // Restore original text attribute
+    SetConsoleTextAttribute(hConsole, originalAttr);
     return true;
 }
 
@@ -101,6 +106,42 @@ bool ConsoleBufferManager::MaximizeWindowNoScrollbars(HANDLE hConsole) {
     SMALL_RECT maxWin{ 0, 0, SHORT(largest.X - 1), SHORT(largest.Y - 1) };
     if (!SetConsoleWindowInfo(hConsole, TRUE, &maxWin)) return false;
     ShowScrollBar(hwnd, SB_BOTH, FALSE);
+    return true;
+}
+
+bool ConsoleBufferManager::PrintColor(HANDLE hConsole, COLORREF rgb, const char* text) {
+    if (!text) return false;
+
+    // Prefer truecolor VT sequences; enable VT if possible
+    EnableVirtualTerminal(hConsole);
+
+    // Extract RGB components
+    BYTE r = GetRValue(rgb);
+    BYTE g = GetGValue(rgb);
+    BYTE b = GetBValue(rgb);
+
+    // SGR: 38;2;r;g;b sets foreground truecolor
+    char prefix[64];
+    int n = snprintf(prefix, sizeof(prefix), "\x1b[38;2;%u;%u;%um", (unsigned)r, (unsigned)g, (unsigned)b);
+    if (n < 0) return false;
+
+    DWORD written = 0;
+    WriteConsoleA(hConsole, prefix, (DWORD)strlen(prefix), &written, nullptr);
+    WriteConsoleA(hConsole, text, (DWORD)strlen(text), &written, nullptr);
+
+    // Reset attributes
+    const char* reset = "\x1b[0m";
+    WriteConsoleA(hConsole, reset, (DWORD)strlen(reset), &written, nullptr);
+    return true;
+}
+
+bool ConsoleBufferManager::EnableVirtualTerminal(HANDLE hConsole) {
+    DWORD mode = 0;
+    if (!GetConsoleMode(hConsole, &mode)) return false;
+    if ((mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+        DWORD newMode = mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        SetConsoleMode(hConsole, newMode);
+    }
     return true;
 }
 

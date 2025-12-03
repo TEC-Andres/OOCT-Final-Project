@@ -15,7 +15,9 @@ int main()
         std::cerr << "Failed to maximize and color console." << std::endl;
     }
 
-    std::cout << "Maximized colored screen ready (no scrollbars). Press Enter to exit..." << std::endl;
+    ConsoleBufferManager::PrintColor(hOut, RGB(0x00, 0xFF, 0x00), "This is a test message in green text on a custom background.\n");
+    ConsoleBufferManager::PrintColor(hOut, RGB(0x3a, 0x3a, 0x3d), "This is a test message in cyan text on a custom background.\n");
+
     std::cin.get();
 
     // Restore original console state on exit
