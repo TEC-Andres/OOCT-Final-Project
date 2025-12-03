@@ -18,9 +18,9 @@ public:
     static bool DisableScrolling(HANDLE hConsole);
     static bool SetExactWindowAndBufferSize(HANDLE hConsole, SHORT width, SHORT height);
     static bool MaximizeWindowNoScrollbars(HANDLE hConsole);
-    // Print text using an arbitrary RGB foreground without globally overriding colors.
-    // Temporarily maps a spare palette slot, prints, then restores palette and attributes.
-    static bool PrintColor(HANDLE hConsole, COLORREF rgb, const char* text);
+    // Print text using arbitrary RGB foreground and background (default: current bg)
+    static bool PrintColor(HANDLE hConsole, COLORREF fg, const char* text);
+    static bool PrintColor(HANDLE hConsole, COLORREF fg, COLORREF bg, const char* text);
     // Enable ANSI VT processing for truecolor support (Windows 10+)
     static bool EnableVirtualTerminal(HANDLE hConsole);
     static bool MaximizeAndColor(

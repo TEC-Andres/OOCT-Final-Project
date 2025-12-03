@@ -109,27 +109,30 @@ bool ConsoleBufferManager::MaximizeWindowNoScrollbars(HANDLE hConsole) {
     return true;
 }
 
-bool ConsoleBufferManager::PrintColor(HANDLE hConsole, COLORREF rgb, const char* text) {
+bool ConsoleBufferManager::PrintColor(HANDLE hConsole, COLORREF fg, const char* text) {
+    // Use current background color from the console
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi))
+        return false;
+    WORD attr = csbi.wAttributes;
+    // Try to extract the background color as RGB from the VT background if possible
+    // Fallback: use black if not available
+    COLORREF bg = RGB(0, 0, 0);
+    // Optionally, you could store the last used VT background in a static/global if you want perfect match
+    return PrintColor(hConsole, fg, bg, text);
+}
+
+bool ConsoleBufferManager::PrintColor(HANDLE hConsole, COLORREF fg, COLORREF bg, const char* text) {
     if (!text) return false;
-
-    // Prefer truecolor VT sequences; enable VT if possible
     EnableVirtualTerminal(hConsole);
-
-    // Extract RGB components
-    BYTE r = GetRValue(rgb);
-    BYTE g = GetGValue(rgb);
-    BYTE b = GetBValue(rgb);
-
-    // SGR: 38;2;r;g;b sets foreground truecolor
-    char prefix[64];
-    int n = snprintf(prefix, sizeof(prefix), "\x1b[38;2;%u;%u;%um", (unsigned)r, (unsigned)g, (unsigned)b);
+    BYTE fr = GetRValue(fg), fg_ = GetGValue(fg), fb = GetBValue(fg);
+    BYTE br = GetRValue(bg), bg_ = GetGValue(bg), bb = GetBValue(bg);
+    char prefix[128];
+    int n = snprintf(prefix, sizeof(prefix), "\x1b[38;2;%u;%u;%um\x1b[48;2;%u;%u;%um", (unsigned)fr, (unsigned)fg_, (unsigned)fb, (unsigned)br, (unsigned)bg_, (unsigned)bb);
     if (n < 0) return false;
-
     DWORD written = 0;
     WriteConsoleA(hConsole, prefix, (DWORD)strlen(prefix), &written, nullptr);
     WriteConsoleA(hConsole, text, (DWORD)strlen(text), &written, nullptr);
-
-    // Reset attributes
     const char* reset = "\x1b[0m";
     WriteConsoleA(hConsole, reset, (DWORD)strlen(reset), &written, nullptr);
     return true;

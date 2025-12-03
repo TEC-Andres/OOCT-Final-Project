@@ -15,8 +15,10 @@ int main()
         std::cerr << "Failed to maximize and color console." << std::endl;
     }
 
-    ConsoleBufferManager::PrintColor(hOut, RGB(0x00, 0xFF, 0x00), "This is a test message in green text on a custom background.\n");
-    ConsoleBufferManager::PrintColor(hOut, RGB(0x3a, 0x3a, 0x3d), "This is a test message in cyan text on a custom background.\n");
+    // Use the same background as the one set by ColorConsole
+    COLORREF bg = RGB(0x2e, 0x30, 0x2f);
+    ConsoleBufferManager::PrintColor(hOut, RGB(0x00, 0xFF, 0x00), bg, "This is a test message in green text on a custom background.\n");
+    ConsoleBufferManager::PrintColor(hOut, RGB(0x00, 0xFF, 0xFF), bg, "This is a test message in cyan text on a custom background.\n");
 
     std::cin.get();
 
