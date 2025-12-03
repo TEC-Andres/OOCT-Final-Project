@@ -1,0 +1,110 @@
+#include "consoleBufferManager.h"
+#include <windows.h>
+#include <iostream>
+
+bool ConsoleBufferManager::AdjustBufferToWindow(HANDLE hOut) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(hOut, &csbi)) {
+        std::cout << "GetConsoleScreenBufferInfo() failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+
+    short winHeight = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    COORD newSize{ csbi.dwSize.X, winHeight };
+
+    if (!SetConsoleScreenBufferSize(hOut, newSize)) {
+        std::cout << "SetConsoleScreenBufferSize() failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+void ConsoleBufferManager::SaveConsoleState(HANDLE hConsole, ConsoleState &state) {
+    state.info.cbSize = sizeof(CONSOLE_SCREEN_BUFFER_INFOEX);
+    GetConsoleScreenBufferInfoEx(hConsole, &state.info);
+
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    GetConsoleScreenBufferInfo(hConsole, &csbi);
+    state.originalAttributes = csbi.wAttributes;
+}
+
+void ConsoleBufferManager::RestoreConsoleState(HANDLE hConsole, const ConsoleState &state) {
+    SetConsoleScreenBufferInfoEx(hConsole, const_cast<CONSOLE_SCREEN_BUFFER_INFOEX*>(&state.info));
+    SetConsoleTextAttribute(hConsole, state.originalAttributes);
+}
+
+bool ConsoleBufferManager::SetExactWindowAndBufferSize(HANDLE hConsole, SHORT width, SHORT height) {
+    SMALL_RECT tiny{ 0, 0, 0, 0 };
+    if (!SetConsoleWindowInfo(hConsole, TRUE, &tiny)) {
+        std::cout << "SetConsoleWindowInfo(1x1) failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+
+    COORD buf{ width, height };
+    if (!SetConsoleScreenBufferSize(hConsole, buf)) {
+        std::cout << "SetConsoleScreenBufferSize(target) failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+
+    SMALL_RECT winRect{ 0, 0, SHORT(width - 1), SHORT(height - 1) };
+    if (!SetConsoleWindowInfo(hConsole, TRUE, &winRect)) {
+        std::cout << "SetConsoleWindowInfo(target) failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+bool ConsoleBufferManager::DisableScrolling(HANDLE hConsole) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        std::cout << "GetConsoleScreenBufferInfo() failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+    SHORT width = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    SHORT height = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    return SetExactWindowAndBufferSize(hConsole, width, height);
+}
+
+bool ConsoleBufferManager::ColorConsole(HANDLE hConsole, COLORREF backgroundRgb, WORD fillAttr) {
+    CONSOLE_SCREEN_BUFFER_INFOEX csbiex{ sizeof(CONSOLE_SCREEN_BUFFER_INFOEX) };
+    if (GetConsoleScreenBufferInfoEx(hConsole, &csbiex)) {
+        csbiex.ColorTable[1] = backgroundRgb;  // BLUE index override
+        csbiex.ColorTable[9] = backgroundRgb;  // INTENSE BLUE override
+        SetConsoleScreenBufferInfoEx(hConsole, &csbiex);
+    }
+
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) return false;
+
+    DWORD bufferSize = DWORD(csbi.dwSize.X) * DWORD(csbi.dwSize.Y);
+    COORD origin{ 0, 0 };
+    DWORD written = 0;
+
+    FillConsoleOutputCharacterA(hConsole, ' ', bufferSize, origin, &written);
+    FillConsoleOutputAttribute(hConsole, fillAttr, bufferSize, origin, &written);
+    SetConsoleTextAttribute(hConsole, fillAttr);
+    return true;
+}
+
+bool ConsoleBufferManager::MaximizeWindowNoScrollbars(HANDLE hConsole) {
+    HWND hwnd = GetConsoleWindow();
+    if (!hwnd) return false;
+
+    COORD largest = GetLargestConsoleWindowSize(hConsole);
+    if (largest.X <= 0 || largest.Y <= 0) return false;
+    SMALL_RECT tiny{0,0,0,0};
+    SetConsoleWindowInfo(hConsole, TRUE, &tiny);
+    COORD buf{ largest.X, largest.Y };
+    if (!SetConsoleScreenBufferSize(hConsole, buf)) return false;
+    SMALL_RECT maxWin{ 0, 0, SHORT(largest.X - 1), SHORT(largest.Y - 1) };
+    if (!SetConsoleWindowInfo(hConsole, TRUE, &maxWin)) return false;
+    ShowScrollBar(hwnd, SB_BOTH, FALSE);
+    return true;
+}
+
+bool ConsoleBufferManager::MaximizeAndColor(HANDLE hConsole, COLORREF backgroundRgb, WORD fillAttr) {
+    if (!MaximizeWindowNoScrollbars(hConsole)) return false;
+    return ColorConsole(hConsole, backgroundRgb, fillAttr);
+}
