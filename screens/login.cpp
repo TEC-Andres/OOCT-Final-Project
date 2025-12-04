@@ -199,7 +199,7 @@ bool runLoginScreen(HANDLE hIn, HANDLE hOut, std::string& username, std::string&
                     else if (focus == 1) {
                         editField(password, 1);
                         focus = 2; // Move to submit
-                        renderFocusArea(focus, false); // Back to Hover
+                        renderFocusArea(focus, false); // Back to	 Hover
                     }
                 } break;
                 
