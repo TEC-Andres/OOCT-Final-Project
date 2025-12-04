@@ -25,7 +25,7 @@ enum class Anchor {
 class ScreenTitle {
 public:
     // Optional color parameter; if not provided, a default will be used
-    void setTitle(const std::string& text, Anchor anchor, POS offset, COLORREF hexColor = RGB(0xFF,0xFF,0xFF));
+    void setTitle(const std::string& text, Anchor anchor, POS offset, COLORREF hexColor = HEX(0xFF,0xFF,0xFF));
     const std::string& getTitle() const;
     // Render title
     void render(HANDLE hConsole) const;
@@ -34,13 +34,13 @@ private:
     std::string title_{};
     Anchor anchor_{Anchor::TOP_CENTER};
     POS offset_{};
-    COLORREF color_{ RGB(0xFF,0xFF,0xFF) };
+    COLORREF color_{ HEX(0xFF,0xFF,0xFF) };
 };
 
 class ScreenText {
 public:
     // Optional color parameter; if not provided, a default will be used
-    void writeText(const std::string& text, Anchor anchor, POS offset, COLORREF hexColor = RGB(0xFF,0xFF,0xFF));
+    void writeText(const std::string& text, Anchor anchor, POS offset, COLORREF hexColor = HEX(0xFF,0xFF,0xFF));
     void destroyText();
     void render(HANDLE hConsole) const;
 
@@ -49,7 +49,7 @@ private:
     Anchor anchor_{Anchor::TOP_LEFT};
     POS offset_{};
     bool visible_{false};
-    COLORREF color_{ RGB(0xFF,0xFF,0xFF) };
+    COLORREF color_{ HEX(0xFF,0xFF,0xFF) };
 };
 
 class ScreenTextBox {
