@@ -1,15 +1,24 @@
 #include "parentTerminal.h"
 #include <windows.h>
+#include <iostream>
+#include <string>
 
-// Keep this helper simple or empty, since we do the heavy lifting in setFullscreen
-void ParentTerminal::disableScrolling(HANDLE hConsole) {
+bool ParentTerminal::adjustBufferToWindow(HANDLE hOut) {
     CONSOLE_SCREEN_BUFFER_INFO csbi;
-    if (GetConsoleScreenBufferInfo(hConsole, &csbi)) {
-        COORD newSize;
-        newSize.X = csbi.srWindow.Right - csbi.srWindow.Left + 1;
-        newSize.Y = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
-        SetConsoleScreenBufferSize(hConsole, newSize);
+    if (!GetConsoleScreenBufferInfo(hOut, &csbi)) {
+        std::cout << "GetConsoleScreenBufferInfo() failed! Reason : " << GetLastError() << std::endl;
+        return false;
     }
+
+    short winHeight = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    COORD newSize{ csbi.dwSize.X, winHeight };
+
+    if (!SetConsoleScreenBufferSize(hOut, newSize)) {
+        std::cout << "SetConsoleScreenBufferSize() failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+
+    return true;
 }
 
 void ParentTerminal::setFullscreen(HANDLE hConsole) {
@@ -53,25 +62,156 @@ void ParentTerminal::restoreConsoleState(HANDLE hConsole, const ConsoleState &st
     SetConsoleTextAttribute(hConsole, state.originalAttributes);
 }
 
-void ParentTerminal::colorConsole(HANDLE hConsole) {
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    GetConsoleScreenBufferInfo(hConsole, &csbi);
-    DWORD bufferSize = csbi.dwSize.X * csbi.dwSize.Y;
-    COORD bufferStart = {0, 0};
+bool ParentTerminal::setExactWindowAndBufferSize(HANDLE hConsole, SHORT width, SHORT height) {
+    SMALL_RECT tiny{ 0, 0, 0, 0 };
+    if (!SetConsoleWindowInfo(hConsole, TRUE, &tiny)) {
+        std::cout << "SetConsoleWindowInfo(1x1) failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
 
-    CONSOLE_SCREEN_BUFFER_INFOEX csbiex;
-    csbiex.cbSize = sizeof(CONSOLE_SCREEN_BUFFER_INFOEX);
+    COORD buf{ width, height };
+    if (!SetConsoleScreenBufferSize(hConsole, buf)) {
+        std::cout << "SetConsoleScreenBufferSize(target) failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+
+    SMALL_RECT winRect{ 0, 0, SHORT(width - 1), SHORT(height - 1) };
+    if (!SetConsoleWindowInfo(hConsole, TRUE, &winRect)) {
+        std::cout << "SetConsoleWindowInfo(target) failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+bool ParentTerminal::disableScrolling(HANDLE hConsole) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        std::cout << "GetConsoleScreenBufferInfo() failed! Reason : " << GetLastError() << std::endl;
+        return false;
+    }
+    SHORT width = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    SHORT height = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    return setExactWindowAndBufferSize(hConsole, width, height);
+}
+
+bool ParentTerminal::colorConsole(HANDLE hConsole, COLORREF backgroundRgb, WORD fillAttr) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) return false;
+    WORD originalAttr = csbi.wAttributes;
+
+    CONSOLE_SCREEN_BUFFER_INFOEX csbiex{ sizeof(CONSOLE_SCREEN_BUFFER_INFOEX) };
     if (GetConsoleScreenBufferInfoEx(hConsole, &csbiex)) {
-        COLORREF customBlue = RGB(0x3e, 0x40, 0x3f);
-        csbiex.ColorTable[1] = customBlue;
-        csbiex.ColorTable[9] = customBlue;
+        csbiex.ColorTable[1] = backgroundRgb;
+        csbiex.ColorTable[9] = backgroundRgb;
         SetConsoleScreenBufferInfoEx(hConsole, &csbiex);
     }
 
-    WORD cyanAttr = BACKGROUND_BLUE | BACKGROUND_INTENSITY;
-    DWORD written;
-    
-    FillConsoleOutputCharacterA(hConsole, ' ', bufferSize, bufferStart, &written);
-    FillConsoleOutputAttribute(hConsole, cyanAttr, bufferSize, bufferStart, &written);
-    SetConsoleTextAttribute(hConsole, cyanAttr);
+    DWORD bufferSize = DWORD(csbi.dwSize.X) * DWORD(csbi.dwSize.Y);
+    COORD origin{ 0, 0 };
+    DWORD written = 0;
+
+    FillConsoleOutputCharacterA(hConsole, ' ', bufferSize, origin, &written);
+    FillConsoleOutputAttribute(hConsole, fillAttr, bufferSize, origin, &written);
+
+    SetConsoleTextAttribute(hConsole, originalAttr);
+    return true;
+}
+
+bool ParentTerminal::maximizeWindowNoScrollbars(HANDLE hConsole) {
+    HWND hwnd = GetConsoleWindow();
+    if (!hwnd) return false;
+
+    COORD largest = GetLargestConsoleWindowSize(hConsole);
+    if (largest.X <= 0 || largest.Y <= 0) return false;
+    SMALL_RECT tiny{0,0,0,0};
+    SetConsoleWindowInfo(hConsole, TRUE, &tiny);
+    COORD buf{ largest.X, largest.Y };
+    if (!SetConsoleScreenBufferSize(hConsole, buf)) return false;
+    SMALL_RECT maxWin{ 0, 0, SHORT(largest.X - 1), SHORT(largest.Y - 1) };
+    if (!SetConsoleWindowInfo(hConsole, TRUE, &maxWin)) return false;
+    ShowScrollBar(hwnd, SB_BOTH, FALSE);
+    return true;
+}
+
+bool ParentTerminal::printColor(HANDLE hConsole, COLORREF fg, const char* text) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi))
+        return false;
+    COLORREF bg = RGB(0, 0, 0);
+    return printColor(hConsole, fg, bg, text);
+}
+
+bool ParentTerminal::printColor(HANDLE hConsole, COLORREF fg, COLORREF bg, const char* text) {
+    if (!text) return false;
+    enableVirtualTerminal(hConsole);
+    BYTE fr = GetRValue(fg), fg_ = GetGValue(fg), fb = GetBValue(fg);
+    BYTE br = GetRValue(bg), bg_ = GetGValue(bg), bb = GetBValue(bg);
+    char prefix[128];
+    int n = snprintf(prefix, sizeof(prefix), "\x1b[38;2;%u;%u;%um\x1b[48;2;%u;%u;%um", (unsigned)fr, (unsigned)fg_, (unsigned)fb, (unsigned)br, (unsigned)bg_, (unsigned)bb);
+    if (n < 0) return false;
+    DWORD written = 0;
+    WriteConsoleA(hConsole, prefix, (DWORD)strlen(prefix), &written, nullptr);
+    WriteConsoleA(hConsole, text, (DWORD)strlen(text), &written, nullptr);
+    const char* reset = "\x1b[0m";
+    WriteConsoleA(hConsole, reset, (DWORD)strlen(reset), &written, nullptr);
+    return true;
+}
+
+bool ParentTerminal::enableVirtualTerminal(HANDLE hConsole) {
+    DWORD mode = 0;
+    if (!GetConsoleMode(hConsole, &mode)) return false;
+    if ((mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+        DWORD newMode = mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        SetConsoleMode(hConsole, newMode);
+    }
+    return true;
+}
+
+bool ParentTerminal::maximizeAndColor(HANDLE hConsole, COLORREF backgroundRgb, WORD fillAttr) {
+    if (!maximizeWindowNoScrollbars(hConsole)) return false;
+    return colorConsole(hConsole, backgroundRgb, fillAttr);
+}
+
+std::string ParentTerminal::readLine(HANDLE hConsole) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi{};
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        return std::string();
+    }
+
+    WORD oldAttr = csbi.wAttributes;
+
+    // Compute an attribute that keeps the on-screen background but current foreground
+    COORD cursor = csbi.dwCursorPosition;
+    WORD cellAttr = oldAttr;
+    DWORD fetched = 0;
+    ReadConsoleOutputAttribute(hConsole, &cellAttr, 1, cursor, &fetched);
+
+    const WORD BG_MASK = BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED | BACKGROUND_INTENSITY;
+    const WORD FG_MASK = FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY;
+    WORD newAttr = WORD((oldAttr & FG_MASK) | (cellAttr & BG_MASK));
+    SetConsoleTextAttribute(hConsole, newAttr);
+
+    HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
+    if (hIn == INVALID_HANDLE_VALUE) {
+        SetConsoleTextAttribute(hConsole, oldAttr);
+        return std::string();
+    }
+
+    const DWORD bufSize = 4096;
+    char buffer[bufSize];
+    DWORD read = 0;
+    BOOL ok = ReadConsoleA(hIn, buffer, bufSize - 1, &read, nullptr);
+    if (!ok || read == 0) {
+        SetConsoleTextAttribute(hConsole, oldAttr);
+        return std::string();
+    }
+
+    if (read >= bufSize) read = bufSize - 1;
+    buffer[read] = '\0';
+    std::string line(buffer);
+    while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
+
+    SetConsoleTextAttribute(hConsole, oldAttr);
+    return line;
 }
