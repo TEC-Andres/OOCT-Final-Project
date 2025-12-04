@@ -81,6 +81,23 @@ void ScreenTextBox::configure(Anchor anchor, POS offset) {
     offset_ = offset;
 }
 
+void ScreenTextBox::setLabel(const std::string& label) { label_ = label; }
+const std::string& ScreenTextBox::getLabel() const { return label_; }
+void ScreenTextBox::setFocused(bool focused) { focused_ = focused; }
+bool ScreenTextBox::isFocused() const { return focused_; }
+
+void ScreenTextBox::render(HANDLE hConsole) const {
+    ParentTerminal pt;
+    POS boxPos = Screen::computePosition(hConsole, anchor_, offset_);
+    SetConsoleCursorPosition(hConsole, toCoord(boxPos));
+    // Focus highlight: print a background-colored span of spaces, no ASCII box
+    COLORREF highlightBg = focused_ ? HEX(0x44,0x44,0x00) : bg; // subtle yellowish bg when focused
+    const char* spaces = "                    " ; // width ~20
+    pt.printColor(hConsole, HEX(0xFF,0xFF,0xFF), highlightBg, spaces);
+    // Position cursor at start of the input area
+    SetConsoleCursorPosition(hConsole, toCoord(boxPos));
+}
+
 void ScreenTextBox::voidBox(HANDLE hConsole) const {
     POS pos = Screen::computePosition(hConsole, anchor_, offset_);
     SetConsoleCursorPosition(hConsole, toCoord(pos));
@@ -108,6 +125,26 @@ std::string ScreenTextBox::stringBox(HANDLE hConsole) {
 int ScreenTextBox::intCell(HANDLE hConsole) { return intBox(hConsole); }
 std::string ScreenTextBox::stringCell(HANDLE hConsole) { return stringBox(hConsole); }
 
+// ScreenButton
+void ScreenButton::configure(const std::string& text, Anchor anchor, POS offset) {
+    text_ = text; anchor_ = anchor; offset_ = offset;
+}
+void ScreenButton::setFocused(bool focused) { focused_ = focused; }
+bool ScreenButton::isFocused() const { return focused_; }
+void ScreenButton::render(HANDLE hConsole) const {
+    POS pos = Screen::computePosition(hConsole, anchor_, offset_);
+    SetConsoleCursorPosition(hConsole, toCoord(pos));
+    ParentTerminal pt;
+    COLORREF fg = HEX(0xFF,0xFF,0xFF);
+    COLORREF bcol = focused_ ? HEX(0x00,0x55,0x00) : bg;
+    std::string btn = std::string(" ") + text_ + " ";
+    pt.printColor(hConsole, fg, bcol, btn.c_str());
+}
+void ScreenButton::onActivate(HANDLE hConsole) const {
+    // Visual feedback (blink)
+    render(hConsole);
+}
+
 // Screen composition accessors
 ScreenTitle& Screen::title() {
     static ScreenTitle t; return t;
@@ -117,4 +154,7 @@ ScreenText& Screen::text() {
 }
 ScreenTextBox& Screen::textBox() {
     static ScreenTextBox tb; return tb;
+}
+ScreenButton& Screen::button() {
+    static ScreenButton b; return b;
 }

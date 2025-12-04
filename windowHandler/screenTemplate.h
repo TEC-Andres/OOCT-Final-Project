@@ -56,6 +56,11 @@ class ScreenTextBox {
 public:
     // Configure position and anchor for the box
     void configure(Anchor anchor, POS offset);
+    void setLabel(const std::string& label);
+    const std::string& getLabel() const;
+    void setFocused(bool focused);
+    bool isFocused() const;
+    void render(HANDLE hConsole) const;
 
     // Clear/void the box content on screen
     void voidBox(HANDLE hConsole) const;
@@ -71,6 +76,25 @@ public:
 private:
     Anchor anchor_{Anchor::CENTER_LEFT};
     POS offset_{};
+    std::string label_{};
+    bool focused_{false};
+};
+
+class ScreenButton {
+public:
+    void configure(const std::string& text, Anchor anchor, POS offset);
+    void setFocused(bool focused);
+    bool isFocused() const;
+    void render(HANDLE hConsole) const;
+
+    // Activation handler (submit)
+    void onActivate(HANDLE hConsole) const;
+
+private:
+    std::string text_{};
+    Anchor anchor_{Anchor::CENTER};
+    POS offset_{};
+    bool focused_{false};
 };
 
 class Screen {
@@ -78,6 +102,7 @@ public:
     ScreenTitle& title();
     ScreenText& text();
     ScreenTextBox& textBox();
+    ScreenButton& button();
 
     // Utility to translate anchor+offset into absolute screen position
     static POS computePosition(HANDLE hConsole, Anchor anchor, POS offset);
