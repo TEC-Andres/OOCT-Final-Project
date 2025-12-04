@@ -24,6 +24,7 @@ int main()
 
     // Screen example: username and password
     Screen screen;
+    terminal.drawTopBackgroundLine(hOut, HEX(0x0f, 0x24, 0x24));
     screen.title().setTitle("Secure Large Data Login", Anchor::TOP_CENTER, POS{0,0});
     screen.title().render(hOut);
     screen.text().writeText("Username:", Anchor::CENTER_LEFT, POS{2,-1});

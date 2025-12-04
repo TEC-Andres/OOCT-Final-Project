@@ -47,7 +47,7 @@ void ScreenTitle::render(HANDLE hConsole) const {
     SetConsoleCursorPosition(hConsole, toCoord(pos));
     ParentTerminal pt;
     // Use printColor with foreground color, preserving existing background
-    pt.printColor(hConsole, color_, bg, title_.c_str());
+    pt.printColor(hConsole, color_, bg_title, title_.c_str());
 }
 
 // ScreenText

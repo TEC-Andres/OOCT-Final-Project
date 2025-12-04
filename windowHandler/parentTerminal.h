@@ -36,6 +36,9 @@ public:
         WORD fillAttr = WORD(BACKGROUND_BLUE | BACKGROUND_INTENSITY)
     );
 
+    // Draw a full-width background-colored line at the top row
+    bool drawTopBackgroundLine(HANDLE hConsole, COLORREF bgColor);
+
     // Position cursor at the bottom line (leftmost column) of the visible window
     bool moveCursorToBottom(HANDLE hConsole);
 

@@ -224,3 +224,31 @@ std::string ParentTerminal::readLinePreserveBackground(HANDLE hConsole) {
     return line;
 }
 
+bool ParentTerminal::drawTopBackgroundLine(HANDLE hConsole, COLORREF bgColor) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi{};
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) return false;
+    SHORT width = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    // Move cursor to top-left
+    COORD pos{ 0, csbi.srWindow.Top };
+    if (!SetConsoleCursorPosition(hConsole, pos)) return false;
+
+    // Enable VT and set only background color
+    enableVirtualTerminal(hConsole);
+    BYTE br = GetRValue(bgColor), bg = GetGValue(bgColor), bb = GetBValue(bgColor);
+    char prefix[64];
+    int n = snprintf(prefix, sizeof(prefix), "\x1b[48;2;%u;%u;%um", (unsigned)br, (unsigned)bg, (unsigned)bb);
+    if (n < 0) return false;
+    DWORD written = 0;
+    WriteConsoleA(hConsole, prefix, (DWORD)strlen(prefix), &written, nullptr);
+
+    // Write a full line of spaces with background color
+    std::string blanks;
+    blanks.assign((size_t)width, ' ');
+    WriteConsoleA(hConsole, blanks.c_str(), (DWORD)blanks.size(), &written, nullptr);
+
+    // Reset attributes
+    const char* reset = "\x1b[0m";
+    WriteConsoleA(hConsole, reset, (DWORD)strlen(reset), &written, nullptr);
+    return true;
+}
+
