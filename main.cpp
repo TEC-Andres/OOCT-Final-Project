@@ -4,6 +4,7 @@
 #include "windowHandler/pseudoterminal.h"
 #include "windowHandler/screenTemplate.h"
 #include "screens/login.h"
+#include "screens/success.h"
 #include "__global_vars__.h"
 
 int main()
@@ -26,6 +27,11 @@ int main()
     std::string username;
     std::string password;
     bool submitted = runLoginScreen(hIn, hOut, username, password); // Hardcoded screen lol
+
+    // Show success screen only if the password is correct and form submitted
+    if (submitted && password == "password") {
+        runSuccessScreen(hOut, username);
+    }
 
     // PseudoTerminal test: press '!' to open, ESC to leave; type 'exit' to quit app
     PseudoTerminal pt;

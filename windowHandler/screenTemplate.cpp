@@ -5,7 +5,6 @@
 #include "../__global_vars__.h"
 
 static COORD toCoord(const POS& p) { return COORD{ p.x, p.y }; }
-
 POS Screen::computePosition(HANDLE hConsole, Anchor anchor, POS offset) {
     CONSOLE_SCREEN_BUFFER_INFO csbi{};
     GetConsoleScreenBufferInfo(hConsole, &csbi);
@@ -90,10 +89,10 @@ void ScreenTextBox::render(HANDLE hConsole) const {
     ParentTerminal pt;
     POS boxPos = Screen::computePosition(hConsole, anchor_, offset_);
     SetConsoleCursorPosition(hConsole, toCoord(boxPos));
-    // Focus highlight: print a background-colored span of spaces, no ASCII box
-    COLORREF highlightBg = focused_ ? HEX(0x44,0x44,0x00) : bg; // subtle yellowish bg when focused
+    // Background: hover color if focused, otherwise unfocused textbox background
+    COLORREF highlightBg = focused_ ? colHover : textBoxBg;
     const char* spaces = "                    " ; // width ~20
-    pt.printColor(hConsole, HEX(0xFF,0xFF,0xFF), highlightBg, spaces);
+    pt.printColor(hConsole, textCol, highlightBg, spaces);
     // Position cursor at start of the input area
     SetConsoleCursorPosition(hConsole, toCoord(boxPos));
 }
