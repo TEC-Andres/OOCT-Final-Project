@@ -36,9 +36,12 @@ public:
         WORD fillAttr = WORD(BACKGROUND_BLUE | BACKGROUND_INTENSITY)
     );
 
+    // Position cursor at the bottom line (leftmost column) of the visible window
+    bool moveCursorToBottom(HANDLE hConsole);
+
     // Read a line from console without altering the background color.
     // Returns the line (without trailing CR/LF). Uses blocking read.
-    std::string readLine(HANDLE hConsole);
+    std::string readLinePreserveBackground(HANDLE hConsole);
 };
 
 #endif // PARENT_TERMINAL_H

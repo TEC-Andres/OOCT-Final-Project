@@ -2,6 +2,9 @@
 #include <windows.h>
 #include <iostream>
 #include <string>
+#include "pseudoterminal.h"
+
+#define BUFFER_SIZE 4096
 
 bool ParentTerminal::adjustBufferToWindow(HANDLE hOut) {
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -172,8 +175,13 @@ bool ParentTerminal::maximizeAndColor(HANDLE hConsole, COLORREF backgroundRgb, W
     if (!maximizeWindowNoScrollbars(hConsole)) return false;
     return colorConsole(hConsole, backgroundRgb, fillAttr);
 }
-
-std::string ParentTerminal::readLine(HANDLE hConsole) {
+bool ParentTerminal::moveCursorToBottom(HANDLE hConsole) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi{};
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) return false;
+    COORD pos{ 0, csbi.srWindow.Bottom };
+    return SetConsoleCursorPosition(hConsole, pos) != 0;
+}
+std::string ParentTerminal::readLinePreserveBackground(HANDLE hConsole) {
     CONSOLE_SCREEN_BUFFER_INFO csbi{};
     if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
         return std::string();
@@ -215,3 +223,4 @@ std::string ParentTerminal::readLine(HANDLE hConsole) {
     SetConsoleTextAttribute(hConsole, oldAttr);
     return line;
 }
+
