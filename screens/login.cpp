@@ -208,8 +208,6 @@ bool runLoginScreen(HANDLE hIn, HANDLE hOut, std::string& username, std::string&
         }
     }
 
-    screen.text().writeText(("User: " + username + ", Pass: " + password), Anchor::CENTER_LEFT, POS{2,4});
-    screen.text().render(hOut);
-
+    // Do not render debug user/pass here anymore
     return submitted;
 }

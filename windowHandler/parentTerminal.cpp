@@ -251,4 +251,3 @@ bool ParentTerminal::drawTopBackgroundLine(HANDLE hConsole, COLORREF bgColor) {
     WriteConsoleA(hConsole, reset, (DWORD)strlen(reset), &written, nullptr);
     return true;
 }
-
